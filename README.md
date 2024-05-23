@@ -9,7 +9,7 @@ Before running the API, ensure you have the following tools and files:
 
 - Python 3.x
 - pip (Python package manager)
-- `credentials.json` file from Google Cloud Platform with OAuth 2.0 credentials
+- `token.json` file from Google Cloud Platform with OAuth 2.0 credentials
 - `.env` file with necessary environment variables
 
 ## Installation
@@ -17,8 +17,8 @@ Before running the API, ensure you have the following tools and files:
 Clone the repository and navigate to its directory:
 
 ```bash
-$ git clone https://github.com/Mozta/backend_inven_fab24.git
-$ cd backend_inven_fab24
+$ git clone https://github.com/Mozta/backend-inven-fab
+$ cd backend-inven-fab
 ```
 
 Install dependencies:
@@ -35,7 +35,11 @@ Create a `.env` file in the root directory of the project with the following var
 SCOPES=[Your Google Sheets scopes]
 SPREADSHEET_ID=[Your Google Sheets spreadsheet ID]
 RANGE_NAME=[Cell range to access]
+SHEET_REGISTERS=[Sheet of spreadsheet]
 BASE_URL=[Base path for your endpoints]
+SENDGRID_API_KEY=[Api key for the email sender Sendgrid]
+SENDGRID_TEMPLATE_ID=[Template id Sendgrid]
+SENDGRID_FROM_EMAIL=[Email from for Sendgrid]
 ```
 
 ## Execution
@@ -65,4 +69,4 @@ The API uses the OAuth 2.0 flow to authenticate with the Google Sheets API. On f
 The API returns an error message in JSON format if no data is found in the spreadsheet.
 
 ## Production
-
+The application has been deployed on Render. The API is accessible at the following URL: https://backend-inven-fab24.onrender.com/api/v1.
