@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 import os.path
 from google.oauth2.service_account import Credentials
@@ -11,6 +11,9 @@ import base64
 from io import BytesIO
 import dotenv
 from datetime import datetime
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 dotenv.load_dotenv()
 
@@ -112,20 +115,24 @@ def add_register(data):
         print(f"An error occurred: {error}")
         return None
 
-
 def send_email(body):
+    # if sendgrid: return send_email_sendgrid(body)
+    return send_email_smtp(body)
+
+def send_email_sendgrid(body):
     data = {
         "personalizations": [
             {
                 "to": [{"email": body['formData']['email']}],
-                "bcc": [{"email": "REPLACEME_WITH_THE_EMAIL_COPY"},
-                        {"email": "REPLACEME_WITH_THE_EMAIL_COPY"}],
+                # "bcc": [{"email": "REPLACEME_WITH_THE_EMAIL_COPY"},
+                        # {"email": "REPLACEME_WITH_THE_EMAIL_COPY"}],
                 "dynamic_template_data": body
             }
         ],
         "from": {"email": FROM_EMAIL},
         "template_id": TEMPLATE_ID,
     }
+
     try:
         response = sg.send(data)
         print(response.status_code)
@@ -136,6 +143,45 @@ def send_email(body):
         print(e.message)
         return response.status_code
 
+
+def send_email_smtp(body):
+    # Help from Chatgpt:
+
+    # Email configuration
+    # smtp_server = 'host.docker.internal'
+    smtp_server = '127.0.0.1'
+    smtp_port = 2525
+    smtp_username = 'FAB24'
+    smtp_password = ''
+
+    # Set up the MIME
+    msg = MIMEMultipart('alternative')
+    msg['From'] = FROM_EMAIL
+    msg['To'] = body['formData']['email']
+    msg['Subject'] = 'Test confirmation'
+
+    html_content = render_template('email_confirmation.html', body=body)
+    mime_html = MIMEText(html_content, 'html')
+    msg.attach(mime_html)
+
+    html_text = render_template('email_confirmation.txt', body=body)
+    mime_text = MIMEText(html_text, 'plain')
+    msg.attach(mime_text)
+
+
+    # Connect to the SMTP server and send the email
+    try:
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        # server.starttls()
+        server.login(smtp_username, smtp_password)
+        server.sendmail(msg['From'], msg['To'], msg.as_string())
+        server.quit()
+        return 202
+    except Exception as e:
+        print(f'Failed to send email: {str(e)}')
+        return 500
+
+    return 501
 
 def generate_qr_base64(data):
     qr = qrcode.QRCode(
@@ -186,7 +232,7 @@ def send_email_from_form():
 
     data['qr'] = f"data:image/png;base64,{generate_qr_base64(data)}"
     status_code = send_email(data)
-    return jsonify({"status_code": status_code, "message": "Email sent successfully" if status_code == 202 else "Email not sent"})
+    return jsonify({"status_code": status_code, "message": "Email sent successfully" if status_code == 202 else "Email not sent"}), status_code
 
 
 if __name__ == "__main__":
