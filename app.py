@@ -14,6 +14,7 @@ from datetime import datetime
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+import time
 
 dotenv.load_dotenv()
 
@@ -42,6 +43,12 @@ CORS(app)
 app.config['CORS_HEADERS'] = 'Content-Type'
 
 
+apiCache = {
+    "response": None,
+    "timestamp": 0
+}
+
+
 def get_credentials():
     return Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
 
@@ -65,9 +72,31 @@ def get_values():   # Call the Sheets API
         print(f"An error occurred: {error}")
         return []
 
+# With help from ChatGPT
+def get_cached_values(force_refresh=False):
+    cache_duration = 3600  # 1 hour in seconds
+    current_time = time.time()
+    
+    # Check if cached data is available and not expired, and force_refresh is not requested
+    if not force_refresh and apiCache['response'] and (current_time - apiCache['timestamp'] < cache_duration):
+        print("Using cached response")
+        return apiCache['response']
+    
+    # Make the API call
+    print("Fetching new data from API")
+    response = get_values()
 
-def get_spreadsheet_data():  # Get the values from the spreadsheet and return them as a JSON
-    values = get_values()
+    if not response:
+        return response
+
+    # Update the cache with new response and current timestamp
+    apiCache['response'] = response
+    apiCache['timestamp'] = current_time
+
+    return apiCache['response']
+
+def get_spreadsheet_data(force_refresh=False):  # Get the values from the spreadsheet and return them as a JSON
+    values = get_cached_values(force_refresh)
     if not values:
         return jsonify({"error": "No se encontraron datos."})
     else:
@@ -204,7 +233,7 @@ def generate_qr_base64(data):
 
 @app.route(f"/{BASE_URL}/items", methods=["GET"])
 def get_items():
-    values = get_values()
+    values = get_cached_values()
     if not values:
         return jsonify({"error": "No se encontraron datos."})
     else:
@@ -216,8 +245,7 @@ def get_items():
 # Return the values from the spreadsheet as a JSON
 @app.route(f"/{BASE_URL}", methods=["GET"])
 def get_data():
-    return get_spreadsheet_data()
-
+    return get_spreadsheet_data(force_refresh=request.args.get('force', 'false').lower() == 'true')
 
 # Receive the form data and send it via email
 @app.route(f"/{BASE_URL}/send-email", methods=["POST"])
