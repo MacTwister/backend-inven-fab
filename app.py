@@ -115,6 +115,11 @@ def add_register(data):
         service = get_sheet()
         sheet = service.spreadsheets()
 
+        code = data.get('code', '');
+
+        if (code != '' and check_registered_code(code) == True):
+            return False;
+
         items = data.get('items', [])
         items_str = ', '.join([f"{item['id']} (Qty: {item['quantity']})" for item in items])
         subtotal = data.get('subtotal', '')
@@ -127,7 +132,8 @@ def add_register(data):
             formData.get('email', ''),
             items_str,
             subtotal,
-            date
+            date,
+            code,
         ]
 
         body = {
@@ -143,6 +149,34 @@ def add_register(data):
     except HttpError as error:
         print(f"An error occurred: {error}")
         return None
+
+def check_registered_code(code):
+    try:
+        service = get_sheet()
+        sheet = service.spreadsheets()
+
+        # Use configured range to only fetch code column
+        codeColumnRange = SHEET_REGISTERS.split("!")[0] + "!G:G";
+
+        result = (
+            sheet.values()
+            .get(spreadsheetId=SPREADSHEET_ID, range=codeColumnRange)
+            .execute()
+        )
+
+        rows = result.get("values", [])
+
+        if not rows:
+            return False
+
+        for row in rows:
+            if len(row) > 0 and row[0] == code:
+                return True;
+
+        return False;
+    except HttpError as error:
+        print(f"An error occurred: {error}")
+        return False
 
 def send_email(body):
     # if sendgrid: return send_email_sendgrid(body)
@@ -253,15 +287,21 @@ def send_email_from_form():
     data = request.json
 
     result = add_register(data)
-    if result:
-        print("Data added successfully.")
-    else:
+
+    if result == False:
+        return jsonify({"status_code": 200, "message": "Saved already"})
+    elif result is None:
         print("An error occurred while adding the data.")
+        return jsonify({"status_code": 500, "message": "An error occurred"}), 500
 
     data['qr'] = f"data:image/png;base64,{generate_qr_base64(data)}"
     status_code = send_email(data)
     return jsonify({"status_code": status_code, "message": "Email sent successfully" if status_code == 202 else "Email not sent"}), status_code
 
+@app.route(f"/{BASE_URL}/check/<code>", methods=["GET"])
+def check_something(code):
+    hasRegistered = check_registered_code(code)
+    return jsonify({"status": hasRegistered})
 
 if __name__ == "__main__":
     app.run(debug=True)
