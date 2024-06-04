@@ -5,7 +5,7 @@ from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
+from sendgrid.helpers.mail import Mail, Email, To, Content
 import qrcode
 import base64
 from io import BytesIO
@@ -180,27 +180,20 @@ def check_registered_code(code):
         return False
 
 def send_email(body):
-    if SENDGRID_API_KEY:
-        return send_email_sendgrid(body)
-    elif os.getenv('SMTP_HOST'):
-        return send_email_smtp(body)
+    from_email = Email(os.getenv('MAIL_FROM_ADDRESS'), os.getenv('MAIL_FROM_NAME'))
+    to_email = To(body['formData']['email'])
+    subject = 'Workshop materials selection confirmation'
 
-def send_email_sendgrid(body):
-    data = {
-        "personalizations": [
-            {
-                "to": [{"email": body['formData']['email']}],
-                # "bcc": [{"email": "REPLACEME_WITH_THE_EMAIL_COPY"},
-                        # {"email": "REPLACEME_WITH_THE_EMAIL_COPY"}],
-                "dynamic_template_data": body
-            }
-        ],
-        "from": {"email": os.getenv('MAIL_FROM_ADDRESS')},
-        "template_id": TEMPLATE_ID,
-    }
+    # if TEMPLATE_ID:
+
+    text_content = render_template('email_confirmation.txt', body=body)
+    content = Content("text/plain", text_content)
 
     try:
-        response = sg.send(data)
+        mail = Mail(from_email, to_email, subject, content)
+        mail_json = mail.get()
+        response = sg.client.mail.send.post(request_body=mail_json)
+ 
         print(response.status_code)
         print(response.body)
         print(response.headers)
@@ -208,48 +201,6 @@ def send_email_sendgrid(body):
     except Exception as e:
         print(e.message)
         return response.status_code
-
-
-def send_email_smtp(body):
-    # Help from Chatgpt:
-
-    # Email configuration
-    smtp_server = os.getenv('SMTP_HOST')
-    smtp_port = os.getenv('SMTP_PORT')
-    smtp_username = os.getenv('SMTP_USERNAME')
-    smtp_password = os.getenv('SMTP_PASSWORD')
-    smtp_encryption = os.getenv('SMTP_ENCRYPTION')
-
-    msg = MIMEMultipart()
-    msg['From'] = formataddr((os.getenv('MAIL_FROM_NAME'), os.getenv('MAIL_FROM_ADDRESS')))
-    msg['To'] = body['formData']['email']
-    msg['Subject'] = 'Workshop materials selection confirmation'
-
-    qr_image = generate_qr_base64(body)
-    img_base64 = base64.b64encode(qr_image).decode()        
-    body['qr'] = f"data:image/png;base64,{img_base64}"
-
-    text_content = render_template('email_confirmation.txt', body=body)
-    mime_text = MIMEText(text_content, 'plain')
-    msg.attach(mime_text)
-
-    mime_image = MIMEImage(qr_image, name="qrcode.png")
-    msg.attach(mime_image)
-
-    # Connect to the SMTP server and send the email
-    try:
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        if smtp_encryption == 'tls':
-            server.starttls()
-        server.login(smtp_username, smtp_password)
-        server.sendmail(msg['From'], msg['To'], msg.as_string())
-        server.quit()
-        return 202
-    except Exception as e:
-        print(f'Failed to send email: {str(e)}')
-        return 500
-
-    return 501
 
 def generate_qr_base64(data):
     qr = qrcode.QRCode(
