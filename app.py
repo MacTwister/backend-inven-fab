@@ -14,6 +14,8 @@ from datetime import datetime
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.mime.image import MIMEImage
+from email.utils import formataddr
 import time
 
 dotenv.load_dotenv()
@@ -27,7 +29,6 @@ RANGE_NAME = os.getenv("RANGE_NAME")
 SHEET_REGISTERS = os.getenv("SHEET_REGISTERS")
 
 SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY')
-FROM_EMAIL = os.getenv("SENDGRID_FROM_EMAIL")
 TEMPLATE_ID = os.getenv('SENDGRID_TEMPLATE_ID')
 
 # Path to the service account credentials file
@@ -179,8 +180,10 @@ def check_registered_code(code):
         return False
 
 def send_email(body):
-    # if sendgrid: return send_email_sendgrid(body)
-    return send_email_smtp(body)
+    if SENDGRID_API_KEY:
+        return send_email_sendgrid(body)
+    elif os.getenv('SMTP_HOST'):
+        return send_email_smtp(body)
 
 def send_email_sendgrid(body):
     data = {
@@ -192,7 +195,7 @@ def send_email_sendgrid(body):
                 "dynamic_template_data": body
             }
         ],
-        "from": {"email": FROM_EMAIL},
+        "from": {"email": os.getenv('MAIL_FROM_ADDRESS')},
         "template_id": TEMPLATE_ID,
     }
 
@@ -211,31 +214,33 @@ def send_email_smtp(body):
     # Help from Chatgpt:
 
     # Email configuration
-    # smtp_server = 'host.docker.internal'
-    smtp_server = '127.0.0.1'
-    smtp_port = 2525
-    smtp_username = 'FAB24'
-    smtp_password = ''
+    smtp_server = os.getenv('SMTP_HOST')
+    smtp_port = os.getenv('SMTP_PORT')
+    smtp_username = os.getenv('SMTP_USERNAME')
+    smtp_password = os.getenv('SMTP_PASSWORD')
+    smtp_encryption = os.getenv('SMTP_ENCRYPTION')
 
-    # Set up the MIME
-    msg = MIMEMultipart('alternative')
-    msg['From'] = FROM_EMAIL
+    msg = MIMEMultipart()
+    msg['From'] = formataddr((os.getenv('MAIL_FROM_NAME'), os.getenv('MAIL_FROM_ADDRESS')))
     msg['To'] = body['formData']['email']
-    msg['Subject'] = 'Test confirmation'
+    msg['Subject'] = 'Workshop materials selection confirmation'
 
-    html_content = render_template('email_confirmation.html', body=body)
-    mime_html = MIMEText(html_content, 'html')
-    msg.attach(mime_html)
+    qr_image = generate_qr_base64(body)
+    img_base64 = base64.b64encode(qr_image).decode()        
+    body['qr'] = f"data:image/png;base64,{img_base64}"
 
-    html_text = render_template('email_confirmation.txt', body=body)
-    mime_text = MIMEText(html_text, 'plain')
+    text_content = render_template('email_confirmation.txt', body=body)
+    mime_text = MIMEText(text_content, 'plain')
     msg.attach(mime_text)
 
+    mime_image = MIMEImage(qr_image, name="qrcode.png")
+    msg.attach(mime_image)
 
     # Connect to the SMTP server and send the email
     try:
         server = smtplib.SMTP(smtp_server, smtp_port)
-        # server.starttls()
+        if smtp_encryption == 'tls':
+            server.starttls()
         server.login(smtp_username, smtp_password)
         server.sendmail(msg['From'], msg['To'], msg.as_string())
         server.quit()
@@ -258,12 +263,10 @@ def generate_qr_base64(data):
 
     img = qr.make_image(fill_color="black", back_color="white")
 
-    # Convertir la imagen a base64
     buffered = BytesIO()
     img.save(buffered, format="PNG")
-    img_base64 = base64.b64encode(buffered.getvalue())
 
-    return img_base64.decode()
+    return buffered.getvalue()
 
 @app.route(f"/{BASE_URL}/items", methods=["GET"])
 def get_items():
@@ -294,8 +297,12 @@ def send_email_from_form():
         print("An error occurred while adding the data.")
         return jsonify({"status_code": 500, "message": "An error occurred"}), 500
 
-    data['qr'] = f"data:image/png;base64,{generate_qr_base64(data)}"
+    # Probably will not happen if using app or hacking app
+    if not data.get('code'):
+        return jsonify({"error": "Data saved"}), 202
+
     status_code = send_email(data)
+
     return jsonify({"status_code": status_code, "message": "Email sent successfully" if status_code == 202 else "Email not sent"}), status_code
 
 @app.route(f"/{BASE_URL}/check/<code>", methods=["GET"])

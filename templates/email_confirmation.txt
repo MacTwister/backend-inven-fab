@@ -1,25 +1,24 @@
-Dear {{ body['formData']['name'] }},
+Hi {{ body['formData']['name'] }},
 
-Thank you for registering for the workshop titled "{{ body['formData']['workshopTitle'] }}". We a=
-re excited to have you join us!
+Thank you for sending the inventory list for your workshop. 
 
-Here are the details we have received:
+Find below a summary of the details we have received:
 
-*Workshop Title:* {{ body['formData']['workshopTitle'] }}
-*Your Name:* {{ body['formData']['name'] }}
-*Email:* {{ body['formData']['email'] }}
+Workshop Title: {{ body['formData']['workshopTitle'] }}
+Your Name: {{ body['formData']['name'] }}
 
-*Items:*
 {% for item in body['items'] %}
 Item: {{ item['id'] }}, Quantity: {{ item['quantity'] }}
 {% endfor %}
+Subtotal: {{ body['subtotal'] }}
 
-*Subtotal:* {{ body['subtotal'] }}
+If any of these details are incorrect, please let us know as 
+soon as possible by replying to this email. 
+More information about the workshop, including the agenda and 
+logistics, will be sent to you in the upcoming days. 
 
-If any of these details are incorrect, please let us know as soon as possible by 
-replying to this email. We look forward to your participation. More information about 
-the workshop, including the agenda and logistics, will be sent to you in the upcoming days. 
 
-Best regards,
+We are excited to have you join us!
 
-FAB24
+Thanks,
+The FAB24 Mexico team
