@@ -256,6 +256,9 @@ def get_data():
 def send_email_from_form():
     data = request.json
 
+    if not data.get('code'):
+        return jsonify({"status_code": 200, "message": "OK"}), 200
+
     result = add_register(data)
 
     if result == False:
@@ -264,9 +267,9 @@ def send_email_from_form():
         print("An error occurred while adding the data.")
         return jsonify({"status_code": 500, "message": "An error occurred"}), 500
 
-    # Probably will not happen if using app or hacking app
-    if not data.get('code'):
-        return jsonify({"error": "Data saved"}), 202
+    # Skip email if a "Nothing needed" request
+    if 'items' in data and len(data['items']) > 0 and data['items'][0].get('id') == 'Nothing Please':
+        return jsonify({"status_code": 202, "message": "Data saved"}), 202
 
     status_code = send_email(data)
 
