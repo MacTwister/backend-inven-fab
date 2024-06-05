@@ -182,7 +182,10 @@ def check_registered_code(code):
 def send_email(body):
     from_email = Email(os.getenv('MAIL_FROM_ADDRESS'), os.getenv('MAIL_FROM_NAME'))
     to_email = To(body['formData']['email'])
-    subject = 'Workshop materials selection confirmation'
+
+    title = body['formData']['workshopTitle']
+    trimmed_title = title[:20] + '...' if len(title) > 20 else title
+    subject = f"Thank you for your materials selection for {trimmed_title}"
 
     # if TEMPLATE_ID:
 
