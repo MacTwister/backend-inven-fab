@@ -17,6 +17,7 @@ from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from email.utils import formataddr
 import time
+import logging
 
 dotenv.load_dotenv()
 
@@ -214,8 +215,8 @@ def send_email(body):
         print(response.headers)
         return response.status_code
     except Exception as e:
-        print(e.message)
-        return response.status_code
+        logging.warning(e.body)
+        return 500
 
 def generate_qr_base64(data):
     qr = qrcode.QRCode(
