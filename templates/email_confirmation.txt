@@ -10,8 +10,6 @@ Your Name: {{ body['formData']['name'] }}
 Item: {{ item['id'] }}, Quantity: {{ item['quantity'] }}
 {% endfor %}
 
-Subtotal: {{ body['subtotal'] }}
-
 If any of these details are incorrect, please let us know as soon as possible by replying to this email.
 More information about the workshop, including the agenda and logistics, will be sent to you in the upcoming days.
 
