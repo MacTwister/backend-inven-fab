@@ -5,7 +5,7 @@ from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Email, To, Content
+from sendgrid.helpers.mail import Mail, Email, To, Content, Attachment
 import qrcode
 import base64
 from io import BytesIO
@@ -192,8 +192,20 @@ def send_email(body):
     text_content = render_template('email_confirmation.txt', body=body)
     content = Content("text/plain", text_content)
 
+    mail = Mail(from_email, to_email, subject, content)
+
+    # Adds QR image as an attachment
+    qr_image = generate_qr_base64(body)
+    qr_img_base64 = base64.b64encode(qr_image).decode()
+    attachment = Attachment()
+    attachment.file_content = qr_img_base64
+    attachment.file_type = "image/png"
+    attachment.file_name = "qrcode.png"
+    attachment.disposition = "attachment"
+    attachment.content_id = "QR Code"
+    mail.add_attachment(attachment)
+
     try:
-        mail = Mail(from_email, to_email, subject, content)
         mail_json = mail.get()
         response = sg.client.mail.send.post(request_body=mail_json)
  
