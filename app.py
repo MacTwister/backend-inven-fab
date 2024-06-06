@@ -49,6 +49,10 @@ apiCache = {
     "response": None,
     "timestamp": 0
 }
+checkCache = {
+    "response": None,
+    "timestamp": 0
+}
 
 
 def get_credentials():
@@ -76,7 +80,7 @@ def get_values():   # Call the Sheets API
 
 # With help from ChatGPT
 def get_cached_values(force_refresh=False):
-    cache_duration = 3600  # 1 hour in seconds
+    cache_duration = 3600*6  # in seconds
     current_time = time.time()
     
     # Check if cached data is available and not expired, and force_refresh is not requested
@@ -147,38 +151,51 @@ def add_register(data):
             valueInputOption="RAW",
             body=body
         ).execute()
+
+        # Force clear cache if new save
+        checkCache['timestamp'] = 0;
+
         return result
     except HttpError as error:
         print(f"An error occurred: {error}")
         return None
 
 def check_registered_code(code):
-    try:
-        service = get_sheet()
-        sheet = service.spreadsheets()
+    cache_duration = 3600 # in seconds
+    current_time = time.time()
+    
+    # Fetch column if not cached
+    if not checkCache['response'] or (current_time - checkCache['timestamp'] > cache_duration):
+        try:
+            service = get_sheet()
+            sheet = service.spreadsheets()
 
-        # Use configured range to only fetch code column
-        codeColumnRange = SHEET_REGISTERS.split("!")[0] + "!G:G";
+            # Use configured range to only fetch code column
+            codeColumnRange = SHEET_REGISTERS.split("!")[0] + "!G:G";
 
-        result = (
-            sheet.values()
-            .get(spreadsheetId=SPREADSHEET_ID, range=codeColumnRange)
-            .execute()
-        )
+            result = (
+                sheet.values()
+                .get(spreadsheetId=SPREADSHEET_ID, range=codeColumnRange)
+                .execute()
+            )
 
-        rows = result.get("values", [])
+            rows = result.get("values", [])
 
-        if not rows:
+            if not rows:
+                return False
+
+            checkCache['response'] = rows
+            checkCache['timestamp'] = current_time
+        except HttpError as error:
+            print(f"An error occurred: {error}")
             return False
 
-        for row in rows:
-            if len(row) > 0 and row[0] == code:
-                return True;
+    for row in checkCache['response']:
+        if len(row) > 0 and row[0] == code:
+            return True;
 
-        return False;
-    except HttpError as error:
-        print(f"An error occurred: {error}")
-        return False
+    return False;
+    
 
 def send_email(body):
     from_email = Email(os.getenv('MAIL_FROM_ADDRESS'), os.getenv('MAIL_FROM_NAME'))
